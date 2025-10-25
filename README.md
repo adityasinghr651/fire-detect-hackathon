@@ -1,8 +1,14 @@
-                                                                                Project Agni-Rakshak
+<h1 align="center">🔥 Project Agni-Rakshak 🔥</h1>
+<p align="center">
+<b>A 3D Real-Time Predictive Fire Intelligence Dashboard</b>
+</p>
+<p align="center">
+<i>Move over 2D maps. This is a "J.A.R.V.I.S." style 3D digital twin that visualizes AI insights and live weather data in real-time.</i>
+</p>
 
-A 3D Real-Time Predictive Fire Intelligence Dashboard
+<p align="center">
 
-Project Agni-Rakshak is a next-generation command center designed to monitor and predict forest fire emergencies. We move away from 2D maps to a "J.A.R.V.I.S." style 3D digital twin that visualizes AI insights and live weather data in real-time.
+</p>
 
 🚀 Core Features
 
@@ -40,29 +46,11 @@ The "Live Intel" section in the 2D HUD updates with the live weather data.
 
 🛠️ Tech Stack
 
-Frontend:
+This project is built with a modern, real-time technology stack.
 
-Next.js (React Framework)
+Frontend
 
-React Three Fiber (@react-three/fiber)
-
-Drei (R3F Helpers)
-
-TensorFlow.js (@tfjs/coco-ssd)
-
-socket.io-client
-
-Tailwind CSS
-
-Backend:
-
-FastAPI (Async Python Framework)
-
-python-socketio (WebSocket Server)
-
-uvicorn (ASGI Server)
-
-httpx (Async API calls)
+Backend
 
 🖥️ Setup & Installation Guide
 
@@ -107,7 +95,7 @@ pip install -r requirements.txt
 python main.py
 
 
-Your backend is now running at http://127.0.0.1:8000. Leave this terminal running.
+✅ Your backend is now running at http://127.0.0.1:8000. Leave this terminal running.
 
 3. Frontend Setup (Terminal 2)
 
@@ -122,6 +110,8 @@ npm install
 # 3. Run the frontend app
 npm run dev
 
+
+✅ Your frontend is now running at http://localhost:3000.
 
 4. Access the Project
 
