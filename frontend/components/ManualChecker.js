@@ -62,7 +62,7 @@ export default function ManualChecker() {
             onChange={(e) => setTemp(e.target.value)}
             placeholder="e.g., 35"
             required
-            className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-900 leading-tight focus:outline-none focus:shadow-outline"
+            className="shadow appearance-none border rounded w-full py-2 px-3 text-white-900 leading-tight focus:outline-none focus:shadow-outline"
           />
         </div>
         <div className="mb-4">
@@ -76,7 +76,7 @@ export default function ManualChecker() {
             onChange={(e) => setHumidity(e.target.value)}
             placeholder="e.g., 25"
             required
-            className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-900 leading-tight focus:outline-none focus:shadow-outline"
+            className="shadow appearance-none border rounded w-full py-2 px-3 text-white-900 leading-tight focus:outline-none focus:shadow-outline"
           />
         </div>
         <div className="mb-6">
@@ -90,7 +90,7 @@ export default function ManualChecker() {
             onChange={(e) => setWindSpeed(e.target.value)}
             placeholder="e.g., 20"
             required
-            className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-900 leading-tight focus:outline-none focus:shadow-outline"
+            className="shadow appearance-none border rounded w-full py-2 px-3 text-white-900 leading-tight focus:outline-none focus:shadow-outline"
           />
         </div>
         <div className="flex items-center justify-center">
@@ -115,7 +115,7 @@ export default function ManualChecker() {
           )}
           {prediction && (
             <div className="text-center">
-              <h3 className="text-lg font-bold mb-2">Manual Prediction</h3>
+              <h3 className="text-lg font-bold mb-2">Prediction</h3>
               <p className={`text-3xl font-extrabold ${
                 prediction.risk_level === 'High' ? 'text-red-500' :
                 prediction.risk_level === 'Medium' ? 'text-yellow-500' :
@@ -129,7 +129,7 @@ export default function ManualChecker() {
             </div>
           )}
           {!prediction && !error && !isLoading && (
-            <p className="text-gray-400">Run a manual check.</p>
+            <p className="text-gray-400">Prediction displayed.</p>
           )}
         </div>
       </div>

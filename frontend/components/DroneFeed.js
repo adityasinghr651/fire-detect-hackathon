@@ -1,17 +1,16 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 
-// --- NEW, MORE RELIABLE VIDEO SOURCE ---
+// Video source
 const videoSrc = "https://cdn.pixabay.com/video/2019/02/10/22022-315181754_large.mp4";
 
-// --- UPDATED FAKE DETECTIONS to match the new video ---
+// Fake detections
 const detections = [
   { time: 3000, x: 600, y: 300, w: 100, h: 80, label: "THERMAL HOTSPOT" },
   { time: 10000, x: 400, y: 200, w: 150, h: 100, label: "SMOKE DETECTED" },
   { time: 20000, x: 100, y: 400, w: 120, h: 90, label: "HOTSPOT" },
 ];
-// ---------------------------------------------------
 
 export default function DroneFeed() {
   const videoRef = useRef(null);
@@ -49,7 +48,6 @@ export default function DroneFeed() {
       // 4. Draw the "AI" box if we have a detection
       if (activeDetection) {
         // Scale coordinates to the video's displayed size
-        // (The video file is 1280x720, but we display it smaller)
         const scaleX = canvas.width / 1280;
         const scaleY = canvas.height / 720;
 
@@ -80,7 +78,6 @@ export default function DroneFeed() {
     
     // Attempt to start play immediately (for autoplay)
     video.play().catch(error => {
-      // Autoplay was prevented. This is fine, user will click.
       console.log("Autoplay prevented:", error);
     });
 

@@ -1,13 +1,52 @@
 import uvicorn
 import socketio
 import asyncio
-import random
 import time
-import httpx  # <-- NAYA IMPORT
+import httpx
+import joblib
+import pandas as pd
+import os  # <-- NAYA: For environment variables
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from dotenv import load_dotenv  # <-- NAYA: To load .env file
+from twilio.rest import Client  # <-- NAYA: Twilio client
 
-# --- (FastAPI aur Socket.IO setup wahi hai) ---
+# --- 1. Load Environment Variables ---
+load_dotenv()  # This loads the .env file
+
+TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
+TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
+TWILIO_PHONE_NUMBER = os.getenv("TWILIO_PHONE_NUMBER")
+RECIPIENT_PHONE_NUMBER = os.getenv("RECIPIENT_PHONE_NUMBER")
+
+# Check if Twilio config is valid
+if not all([TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER, RECIPIENT_PHONE_NUMBER]):
+    print("⚠️ WARNING: Twilio credentials not fully set in .env file. SMS alerts will be disabled.")
+    TWILIO_ENABLED = False
+    twilio_client = None
+else:
+    print("✅ Twilio credentials loaded successfully. SMS alerts are active.")
+    TWILIO_ENABLED = True
+    twilio_client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
+
+# --- 2. AI Model Setup ---
+class WeatherInput(BaseModel):
+    temp: float
+    humidity: float
+    wind_speed: float
+
+try:
+    model = joblib.load('fire_model.joblib')
+    print("✅ AI Model (fire_model.joblib) loaded successfully.")
+except FileNotFoundError:
+    print("❌ ERROR: 'fire_model.joblib' not found. Run 'python train.py'.")
+    exit()
+except Exception as e:
+    print(f"❌ ERROR loading model: {e}")
+    exit()
+
+# --- 3. FastAPI and Socket.IO setup ---
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
@@ -17,17 +56,25 @@ app.add_middleware(
 sio = socketio.AsyncServer(async_mode='asgi', cors_allowed_origins="*")
 app_socket = socketio.ASGIApp(sio, other_asgi_app=app)
 
-# --- NAYA: Weather API ke liye helper ---
-# Dehradun ke coordinates (API call ke liye)
+
+# --- 4. Weather API helper (Same as before) ---
 DISTRICT_COORDINATES = {
     "Dehradun": [30.3165, 78.0322],
-    # Hum baaki bhi add kar sakte hain, abhi demo ke liye ek kaafi hai
+    "Haridwar": [29.9457, 78.1642],
+    "Chamoli": [30.2935, 79.5603],
+    "Rudraprayag": [30.2839, 78.9806],
+    "Tehri Garhwal": [30.3800, 78.4300],
+    "Uttarkashi": [30.7300, 78.4500],
+    "Pauri Garhwal": [30.1500, 78.7700],
+    "Almora": [29.5937, 79.6589],
+    "Bageshwar": [29.8415, 79.7695],
+    "Champawat": [29.3369, 80.0968],
+    "Nainital": [29.3800, 79.4600],
+    "Pithoragarh": [29.5800, 80.2200],
+    "Udham Singh Nagar": [29.5300, 79.5000],
 }
 
 async def get_live_weather(lat, lon):
-    """
-    Open-Meteo API se live weather data fetch karta hai.
-    """
     url = "https://api.open-meteo.com/v1/forecast"
     params = {
         "latitude": lat,
@@ -38,10 +85,8 @@ async def get_live_weather(lat, lon):
     try:
         async with httpx.AsyncClient() as client:
             response = await client.get(url, params=params)
-            response.raise_for_status() # Agar 4xx/5xx error ho toh fail kare
+            response.raise_for_status()
             data = response.json()
-            
-            # API se data nikaal kar return karna
             current = data['current']
             return {
                 "temperature": current['temperature_2m'],
@@ -52,21 +97,70 @@ async def get_live_weather(lat, lon):
         print(f"Weather API error: {e}")
         return None
 
-# --- Simulation state (wahi hai) ---
+# --- 5. NAYA: Twilio Alert Function ---
+def send_alert_message(district):
+    if not TWILIO_ENABLED:
+        print(f"SMS disabled. Would have sent alert for {district}.")
+        return
+
+    try:
+        message_body = (
+            f"🔥 *Agni-Rakshak ALERT* 🔥\n"
+            f"High-risk forest fire predicted in: *{district}, Uttarakhand*.\n"
+            f"Coordinates: {DISTRICT_COORDINATES.get(district, 'N/A')}\n"
+            f"Deploying resources. Check dashboard immediately."
+        )
+        
+        # This sends an SMS. 
+        # To send WhatsApp, change 'from_' to 'from_': 'whatsapp:TWILIO_WHATSAPP_NUMBER'
+        # and 'to' to 'to': 'whatsapp:RECIPIENT_PHONE_NUMBER'
+        message = twilio_client.messages.create(
+            body=message_body,
+            from_=TWILIO_PHONE_NUMBER,
+            to=RECIPIENT_PHONE_NUMBER
+        )
+        print(f"✅ SMS Alert sent successfully! SID: {message.sid}")
+    except Exception as e:
+        print(f"❌ ERROR sending SMS: {e}")
+
+
+# --- 6. AI Prediction Endpoint (Same as before) ---
+@app.post("/predict")
+async def predict_fire_risk(input: WeatherInput):
+    try:
+        input_df = pd.DataFrame([{
+            "temp": input.temp,
+            "RH": input.humidity,
+            "wind": input.wind_speed
+        }])
+        probability = model.predict_proba(input_df)[0][1]
+        
+        risk_level = "Low"
+        if probability > 0.7:
+            risk_level = "High"
+        elif probability > 0.4:
+            risk_level = "Medium"
+
+        return {
+            "probability": probability,
+            "risk_level": risk_level,
+            "model_input": input.dict()
+        }
+    except Exception as e:
+        return {"error": str(e), "status": 500}
+
+
+# --- 7. Simulation & Socket.IO Events ---
 fire_simulation = {
     "active": False,
     "district": None,
-    "start_time": 0,
     "radius": 0.0
 }
-LATEST_HIGH_RISK_DISTRICT = None
 
-# --- (API endpoint wahi hai) ---
 @app.get("/")
 def read_root():
-    return {"Hello": "World"}
+    return {"Hello": "From the Agni-Rakshak API"}
 
-# --- (Socket.IO event listeners wahi hain) ---
 @sio.event
 async def connect(sid, environ):
     print(f"Client connected: {sid}")
@@ -77,100 +171,78 @@ async def disconnect(sid):
 
 @sio.event
 async def ai_alert(sid, data):
-    global LATEST_HIGH_RISK_DISTRICT, fire_simulation
+    global fire_simulation
     district = data.get("district", "Dehradun")
-    print(f"🔥 AI Alert received for {district} from {sid}")
+    print(f"🔥 Manual Fire Simulation triggered for {district} from {sid}")
     
-    # Agar aag pehle se active nahi hai, toh nayi shuru karo
+    # --- NAYA: Send SMS only if it's a *new* fire ---
     if not fire_simulation["active"]:
         print("--- Starting new fire simulation! ---")
         fire_simulation["active"] = True
         fire_simulation["district"] = district
-        fire_simulation["start_time"] = time.time()
-        fire_simulation["radius"] = 0.01 # Initial chhota radius
+        fire_simulation["radius"] = 0.01
+        
+        # ===> TRIGGER THE SMS ALERT <===
+        send_alert_message(district)
     
-    # Live data task ko update karo
+    # This part just updates the map, not part of the 'if'
     LATEST_HIGH_RISK_DISTRICT = district
 
-# --- (Live Data Emitter - POORA BADAL GAYA) ---
+
+# --- 8. Live Data Emitter (Same as before) ---
 async def emit_live_risk_data():
-    """
-    Background mein chalta hai aur real-time weather ke hisaab se
-    fire spread simulate karke data push karta hai.
-    """
-    districts = [
-        "Dehradun", "Haridwar", "Chamoli", "Rudraprayag", "Tehri Garhwal",
-        "Uttarkashi", "Pauri Garhwal", "Almora", "Bageshwar", "Champawat",
-        "Nainital", "Pithoragarh", "Udham Singh Nagar"
-    ]
-    
-    base_spread_rate = 0.005 # Kitni tezi se aag badhegi (base)
+    districts = list(DISTRICT_COORDINATES.keys())
+    base_spread_rate = 0.005 
 
     while True:
         risk_data = {}
-        current_high_risk = LATEST_HIGH_RISK_DISTRICT
-
-        # 1. Pehle sab districts ko 'Low' risk par set karo
+        
         for district in districts:
             risk_data[district] = {
                 "risk_level": "Low", 
-                "probability": 0.1,
+                "probability": 0.0,
                 "radius": 0,
-                "weather": None # Naya field
+                "weather": None
             }
 
-        # 2. Agar aag active hai, toh simulation chalao
         if fire_simulation["active"] and fire_simulation["district"]:
             fire_district = fire_simulation["district"]
-            
-            # 3. Live weather data fetch karo
-            lat, lon = DISTRICT_COORDINATES.get(fire_district, [30.3165, 78.0322])
+            lat, lon = DISTRICT_COORDINATES.get(fire_district, DISTRICT_COORDINATES["Dehradun"])
             weather = await get_live_weather(lat, lon)
             
-            spread_rate_multiplier = 1.0 # Default speed
+            spread_rate_multiplier = 1.0 
 
             if weather:
-                # 4. NAYA "Fire Weather Index" FORMULA
                 temp = weather["temperature"]
                 humidity = weather["humidity"]
                 wind = weather["wind_speed"]
-
-                # Formula:
-                # temp_factor: 30C par 1x, 40C par 1.33x
                 temp_factor = max(0.1, temp / 30.0)
-                # humidity_factor: 30% par 1x, 80% par 0.28x
                 humidity_factor = max(0.1, (100.0 - humidity) / 70.0)
-                # wind_factor: 10km/h par 1x, 30km/h par 3x
                 wind_factor = 1.0 + (wind / 10.0)
-
-                # Total speed = temp * nami * hawa
                 spread_rate_multiplier = temp_factor * humidity_factor * wind_factor
-                
-                # Weather data ko frontend par bhejo
                 risk_data[fire_district]["weather"] = weather
             
-            # 5. Radius ko naye rate ke hisaab se badhao
             dynamic_spread_rate = base_spread_rate * spread_rate_multiplier
             fire_simulation["radius"] += dynamic_spread_rate
-            
-            # 6. High risk data set karo
             risk_data[fire_district]["risk_level"] = "High"
             risk_data[fire_district]["probability"] = 0.99
             risk_data[fire_district]["radius"] = fire_simulation["radius"]
 
-        # 7. Sabko data push karo
         await sio.emit('risk_update', risk_data)
-        
-        # 3 second ruko
         await asyncio.sleep(3)
 
-# --- (Startup aur Main function wahi hai) ---
+
+# --- 9. Startup and Main (Same as before) ---
 @app.on_event("startup")
 async def startup_event():
-    print("Server started... starting background data task.")
+    print("🚀 Server started... starting background data task.")
     asyncio.create_task(emit_live_risk_data())
 
 if __name__ == "__main__":
-    print("Starting server on http://127.0.0.1:8000")
-    uvicorn.run(app_socket, host="127.0.0.1", port=8000)
-
+    print("Starting Agni-Rakshak server on http://127.0.0.1:8000")
+    uvicorn.run(
+        "main:app_socket", 
+        host="127.0.0.1", 
+        port=8000, 
+        reload=True
+    )

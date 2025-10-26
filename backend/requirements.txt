@@ -1,0 +1,10 @@
+twilio
+python-dotenv
+fastapi
+uvicorn
+python-socketio
+httpx
+scikit-learn
+joblib
+pandas
+numpy

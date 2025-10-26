@@ -4,9 +4,8 @@ import { useEffect } from 'react';
 import { useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet-routing-machine';
-// CSS is now in page.js, so we remove the import from here
 
-// --- Custom Icons (Same as before) ---
+// --- Custom Icons ---
 const fireIcon = new L.Icon({
   iconUrl: 'https://cdn-icons-png.flaticon.com/512/3061/3061320.png',
   iconSize: [35, 35],
@@ -61,8 +60,6 @@ export default function AutoRouter({ routePlan }) {
 
     // 4. Cleanup function
     return () => {
-      // --- THIS IS THE FIX ---
-      // Only try to remove layers if the map still exists.
       if (map) {
         if (routingControl) {
           map.removeControl(routingControl);
@@ -71,11 +68,9 @@ export default function AutoRouter({ routePlan }) {
           map.removeLayer(waterMarker);
         }
       }
-      // -----------------------
     };
 
   }, [map, routePlan]); 
 
   return null; // This component doesn't render any visible HTML itself
 }
-
